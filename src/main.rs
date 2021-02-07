@@ -12,13 +12,13 @@ extern crate diesel;
 use crate::auth::BasicAuth;
 mod repositories;
 
-use diesel::prelude::*;
+
 use models::*;
 use repositories::RustaceanRepository;
-use schema::*;
+
 
 use rocket::{
-    http::{ext::IntoCollection, Status},
+    http::Status,
     response::status,
 };
 use rocket_contrib::json::Json;
