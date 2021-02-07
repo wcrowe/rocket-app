@@ -1,0 +1,2 @@
+[global.databases]
+sql_path = {url = "./database.sqlite"}
