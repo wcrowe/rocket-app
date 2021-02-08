@@ -8,21 +8,21 @@ extern crate rocket;
 extern crate rocket_contrib;
 #[macro_use]
 extern crate diesel;
+#[macro_use]
+extern crate diesel_migrations;
 
 use crate::auth::BasicAuth;
 mod repositories;
 
-
 use models::*;
 use repositories::RustaceanRepository;
 
+use rocket::{fairing::AdHoc, http::Status, response::status, Rocket};
 
-use rocket::{
-    http::Status,
-    response::status,
-};
 use rocket_contrib::json::Json;
 use rocket_contrib::json::JsonValue;
+
+embed_migrations!();
 
 #[database("sql_path")]
 struct DbConn(diesel::SqliteConnection);
@@ -35,7 +35,12 @@ async fn get_rustaceans(
     conn.run(|c| {
         RustaceanRepository::load_all(c)
             .map(|rustacean| json!(rustacean))
-            .map_err(|e| status::Custom(Status::InternalServerError, json!(e.to_string())))
+            .map_err(|_| {
+                status::Custom(
+                    Status::InternalServerError,
+                    json!("Server Error".to_string()),
+                )
+            })
     })
     .await
 }
@@ -103,6 +108,24 @@ fn not_found() -> JsonValue {
     json!("Not found!!")
 }
 
+#[catch(500)]
+fn internal_error() -> &'static str {
+    "Whoops! Looks like we messed up."
+}
+
+async fn run_db_migrations(rocket: Rocket) -> Result<Rocket, Rocket> {
+    DbConn::get_one(&rocket).await
+        .expect("database connection")
+        .run(|c| match embedded_migrations::run(c) {
+            Ok(()) => Ok(rocket),
+            Err(e) => {
+                error!("Failed to run database migrations: {:?}", e);
+                Err(rocket)
+            }
+        }).await
+}
+
+
 #[rocket::main]
 async fn main() {
     let _ = rocket::ignite()
@@ -116,8 +139,9 @@ async fn main() {
                 delete_rustaceans
             ],
         )
-        .register(catchers![not_found, not_autherized])
+        .register(catchers![not_found, not_autherized, internal_error])
         .attach(DbConn::fairing())
+        .attach(AdHoc::on_attach("Database Migrations", run_db_migrations))
         .launch()
         .await;
 }
