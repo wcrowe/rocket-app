@@ -1,26 +1,22 @@
 mod auth;
 mod models;
+mod repositories;
 mod schema;
 
-#[macro_use]
-extern crate rocket;
-#[macro_use]
-extern crate rocket_contrib;
 #[macro_use]
 extern crate diesel;
 #[macro_use]
 extern crate diesel_migrations;
+#[macro_use]
+extern crate rocket;
+#[macro_use]
+extern crate rocket_contrib;
 
 use crate::auth::BasicAuth;
-mod repositories;
-
 use models::*;
 use repositories::RustaceanRepository;
-
 use rocket::{fairing::AdHoc, http::Status, response::status, Rocket};
-
-use rocket_contrib::json::Json;
-use rocket_contrib::json::JsonValue;
+use rocket_contrib::json::{Json, JsonValue};
 
 embed_migrations!();
 
@@ -35,10 +31,10 @@ async fn get_rustaceans(
     conn.run(|c| {
         RustaceanRepository::load_all(c)
             .map(|rustacean| json!(rustacean))
-            .map_err(|_| {
+            .map_err(|_e| {
                 status::Custom(
                     Status::InternalServerError,
-                    json!("Server Error".to_string()),
+                    json!("Error getting rustaceans!".to_string()),
                 )
             })
     })
@@ -53,7 +49,12 @@ async fn view_rustaceans(
     conn.run(move |c| {
         RustaceanRepository::find(c, id)
             .map(|rustacean| json!(rustacean))
-            .map_err(|e| status::Custom(Status::InternalServerError, json!(e.to_string())))
+            .map_err(|_e| {
+                status::Custom(
+                    Status::InternalServerError,
+                    json!("Error getting rustaceans!".to_string()),
+                )
+            })
     })
     .await
 }
@@ -66,7 +67,12 @@ async fn create_rustaceans(
     conn.run(|c| {
         RustaceanRepository::create(c, new_rustacean.into_inner())
             .map(|rustacean| json!(rustacean))
-            .map_err(|e| status::Custom(Status::InternalServerError, json!(e.to_string())))
+            .map_err(|_e| {
+                status::Custom(
+                    Status::InternalServerError,
+                    json!("Error creating rustacean!".to_string()),
+                )
+            })
     })
     .await
 }
@@ -80,7 +86,12 @@ async fn update_rustaceans(
     conn.run(move |c| {
         RustaceanRepository::update(c, rustacean.into_inner())
             .map(|rustacean| json!(rustacean))
-            .map_err(|e| status::Custom(Status::InternalServerError, json!(e.to_string())))
+            .map_err(|_e| {
+                status::Custom(
+                    Status::InternalServerError,
+                    json!("Error editing rustacean!".to_string()),
+                )
+            })
     })
     .await
 }
@@ -93,7 +104,12 @@ async fn delete_rustaceans(
     conn.run(move |c| {
         RustaceanRepository::delete(c, id)
             .map(|_| status::NoContent)
-            .map_err(|e| status::Custom(Status::InternalServerError, json!(e.to_string())))
+            .map_err(|_e| {
+                status::Custom(
+                    Status::InternalServerError,
+                    json!("Error removingrustacean!".to_string()),
+                )
+            })
     })
     .await
 }
@@ -114,7 +130,8 @@ fn internal_error() -> &'static str {
 }
 
 async fn run_db_migrations(rocket: Rocket) -> Result<Rocket, Rocket> {
-    DbConn::get_one(&rocket).await
+    DbConn::get_one(&rocket)
+        .await
         .expect("database connection")
         .run(|c| match embedded_migrations::run(c) {
             Ok(()) => Ok(rocket),
@@ -122,9 +139,9 @@ async fn run_db_migrations(rocket: Rocket) -> Result<Rocket, Rocket> {
                 error!("Failed to run database migrations: {:?}", e);
                 Err(rocket)
             }
-        }).await
+        })
+        .await
 }
-
 
 #[rocket::main]
 async fn main() {
