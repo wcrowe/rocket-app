@@ -1,7 +1,7 @@
 mod auth;
-mod models;
-mod repositories;
-mod schema;
+#[path = "repositories/models.rs"] mod models;
+#[path = "repositories/repositories.rs"] mod repositories;
+#[path = "repositories/schema.rs"] mod schema;
 
 #[macro_use]
 extern crate diesel;
@@ -115,8 +115,8 @@ async fn delete_rustaceans(
 }
 
 #[catch(401)]
-fn not_autherized() -> JsonValue {
-    json!("Not Autherized!!")
+fn not_authorized() -> JsonValue {
+    json!("Not Authorized!!")
 }
 
 #[catch(404)]
@@ -156,7 +156,7 @@ async fn main() {
                 delete_rustaceans
             ],
         )
-        .register(catchers![not_found, not_autherized, internal_error])
+        .register(catchers![not_found, not_authorized, internal_error])
         .attach(DbConn::fairing())
         .attach(AdHoc::on_attach("Database Migrations", run_db_migrations))
         .launch()
